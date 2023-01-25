@@ -233,10 +233,14 @@ sprintf("there are %i year's statistics being reported in df", lengths(unique(df
 ## BS degrees in 2015
 
 Is there evidence that more males are in science-related fields vs `Non-S&E`? Provide summary statistics and a plot which shows the number of people by gender and by field. Write a brief summary to describe your findings.
+<<<<<<< Updated upstream
 
 ```{r}
 # 1) Is there evidence that more males are in science-related fields vs `Non-S&E`? 
 print("1)")
+=======
+```{r}
+>>>>>>> Stashed changes
 df_m_s <- df %>%
   filter(Field != 'Non-S&E', Sex == 'Male')%>%
   summarise(deg = sum(Number))
@@ -249,6 +253,7 @@ df_m_ns <- df %>%
 
 num_non_s_males = sum(df_m_ns$deg)
 sprintf("there are %i males with non-science related majors", num_non_s_males)
+<<<<<<< Updated upstream
 
 print("There are fewer males in science-related fields than those in Non-S&E because 423228 < 7356720")
 
@@ -278,10 +283,54 @@ print(summary)
 
 ```
 
+=======
+```
+There are fewer males in science-related fields than those in Non-S&E because 423228 < 7356720
+
+```{r}
+# Provide summary statistics
+df_sum_stat <- df %>%
+  group_by(Sex, Field) %>%
+  summarise(deg = sum(Number))
+
+print(df_sum_stat)
+```
+
+3) plot which shows the number of people by gender and by field. 
+```{r}
+df %>%
+  group_by(Field, Sex) %>%
+  summarize(count = sum(Number)) %>%
+  ggplot(aes(x = Field, y = count, fill = Sex)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  ggtitle("3) Number of people by gender of field")
+```
+4) a brief summary to describe your findings.
+We found that there are more women studying Non S&E subjects and that Engineering subjects tend to have the largest discrepency between men and women outside of Non S&E subjects. We also saw that Psychology had the largest difference in favor of women (more women then men) of all the S&E subjects.
+>>>>>>> Stashed changes
 
 ## EDA bringing type of degree, field and gender in 2015
 
 Describe the number of people by type of degree, field, and gender. Do you see any evidence of gender effects over different types of degrees? Again, provide graphs to summarize your findings.
+<<<<<<< Updated upstream
+=======
+```{r}
+df_d_f_g <- df %>%
+  group_by(Degree, Field, Sex) %>%
+  summarize(count = sum(Number)) 
+  
+df_d <- df %>%
+  group_by(Degree, Field, Sex) %>%
+  summarize(count = sum(Number)) 
+  ggplot(x = Field, y = count, fill = Sex)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  ggtitle("3) Number of people by gender of field")
+
+df_d_f_g
+  
+```
+
+>>>>>>> Stashed changes
 
 ## EDA bring all variables 
 
