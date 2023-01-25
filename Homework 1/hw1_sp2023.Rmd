@@ -238,39 +238,43 @@ Is there evidence that more males are in science-related fields vs `Non-S&E`? Pr
 # 1) Is there evidence that more males are in science-related fields vs `Non-S&E`? 
 print("1)")
 df_m_s <- df %>%
-  filter(Field != 'Non-S&E', Sex == 'Male')
-  sprintf("there are %i males with science related majors", nrow(df_m_s))
+  filter(Field != 'Non-S&E', Sex == 'Male')%>%
+  summarise(deg = sum(Number))
+
+sprintf("there are %i males with science related majors", df_m_s$deg)
 
 df_m_ns <- df %>%
-  filter(Field == 'Non-S&E', Sex == 'Male')
-  num_non_s_males = nrow(df_m_ns)
+  filter(Field == 'Non-S&E', Sex == 'Male')%>%
+  summarise(deg = sum(Number))
 
+num_non_s_males = sum(df_m_ns$deg)
 sprintf("there are %i males with non-science related majors", num_non_s_males)
 
-print("There are more males in science-related fields than those in Non-S&E as 297 > 33")
+print("There are fewer males in science-related fields than those in Non-S&E because 423228 < 7356720")
 
 # 2) Provide summary statistics
 print("2)")
 df_sum_stat <- df %>%
   group_by(Field, Sex) %>%
-  summarize(count = n()) %>%
-  
-View(df_sum_stat)
+  summarise(deg = sum(Number))
 
-# 3) plot which shows the number of people by gender and by field. 
+print(df_sum_stat)
+ 
+# # 3) plot which shows the number of people by gender and by field. 
 print("3) see ggplot")
 
 df %>%
   group_by(Field, Sex) %>%
-  summarize(count = n()) %>%
+  summarize(count = Number) %>%
   ggplot(aes(x = Field, y = count, fill = Sex)) +
   geom_bar(stat = "identity", position = "dodge") +
   ggtitle("3) Number of people by gender of field")
 
 
-
-# 4)  a brief summary to describe your findings.
+# # 4)  a brief summary to describe your findings.
 print("4)")
+summary <- "We found that there are more women studying Non S&E subjects and that Engineering subjects tend to have the largest discrepency between men and women outside of Non S&E subjects. We also saw that Psychology had the largest difference in favor of women (more women then men) of all the S&E subjects."
+print(summary)
 
 ```
 
