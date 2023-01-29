@@ -331,6 +331,8 @@ Here are the datasets:
 
 Feel free to use either dataset to address the problems. 
 
+## 0.Get Started 
+To get started, we would like to load the two datasets first.
 ```{r}
 mlp <- read.csv("/Users/kevinyu/Desktop/Spring 2023/STAT 571/HW/Homework 1/data/MLPayData_Total.csv")
 bb <- read.csv("/Users/kevinyu/Desktop/Spring 2023/STAT 571/HW/Homework 1/data/baseball.csv")
@@ -347,10 +349,9 @@ Create increment in payroll
 ```{r}
 head(mlp)
 head(bb)
+names(mlp)
 names(bb)
 ```
-
-
 
 
 a). To describe the increment of payroll in each year there are several possible approaches. Take 2013 as an example:
@@ -360,22 +361,25 @@ a). To describe the increment of payroll in each year there are several possible
 
 Explain why the log difference is more appropriate in this setup.
 
+The log difference is a more appropriate metric to evaluate the increase in payroll each year for different reasons. Firstly, log difference measures the change in payroll as a percentage change. Option 1, on the other hand, only takes the absolute difference between the current year's payroll and the previous year's payroll. However, since the starting payroll varies for each team, log difference is a better option that takes into account that each team begins at a different payroll level. Additionally, using log difference can correct skewness and outliers.
+
+
 b). Create a new variable `diff_log=log(payroll_2013) - log(payroll_2012)`. Hint: use `dplyr::lag()` function.
 ```{r}
 data_agg <- bb %>%
   group_by(team) %>%
   mutate(
-    lpayroll = lag(payroll),
+    lpayroll = lag(payroll), #use lag function to capture the payroll from previous year
     diff_log = log(payroll) - log(lpayroll)
   )
   
-data_agg
+head(data_agg)
 ```
 c). Create a long data table including: team, year, diff_log, win_pct
 
 ```{r}
 data_long <- data_agg %>%
-  select (team,year,,diff_log,win_pct)
+  select (team,year,,diff_log,win_pct)# Simply select the desire variables we need from dataframe we created earlier
 
 head(data_long)
 ```
@@ -399,7 +403,7 @@ datapay <- mlp %>%
 top_datapay <- head(datapay,5)
 top_datapay
 ```
-
+Based on the results, we can see that the Los Angeles Dodgers, Texas Rangers, San Diego Padres, Pittsburgh Pirates, and Washington Nationals experienced the highest increase in payroll between 2010 and 2014. This information can guide us in our investigation to determine which teams made the most improvement during that time period.
 
 b). Between 2010 and 2014, inclusive, which team(s) "improved" the most? That is, had the biggest percentage gain in wins?
 
@@ -420,7 +424,7 @@ top_winmost
 
 
 ```
-
+Based on the results, the Pittsburgh Pirates, Baltimore Orioles, Seattle Mariners, Washington Nationals, and Kansas City Royals showed the most improvement between 2010 and 2014. Only the Pittsburgh Pirates and Washington Nationals from this list also appeared in the top 5 payroll increase list. These results suggest that an increase in payroll might be related to improved team performance, but performance can also be influenced by factors such as team management, team chemistry, playbooks, etc. Further investigation is needed to determine the extent to which payroll impacts team performance.
 
 ## Do log increases in payroll imply better performance? 
 
@@ -428,21 +432,19 @@ Is there evidence to support the hypothesis that higher increases in payroll on 
 
 Pick up a few statistics, accompanied with some data visualization, to support your answer. 
 
-
+We begin by conducting a correlation test between the winning percentage and the log increase in payroll for each team each year:
 ```{r}
 cor.test(data_long$win_pct, data_long$diff_log)
 ```
-
-
-```{r}
-rcorr(data_long$win_pct, data_long$diff_log)
-```
+The results indicate that there is a weak positive correlation (0.167) between the log difference in payroll and the winning percentage. The p-value of the Pearson's product-moment correlation test is 2e-04, which means that we fail to reject the null hypothesis that the true correlation is equal to zero. This suggests that there is some relationship between the log difference in payroll and the winning percentage, but it is not very strong. Further investigation is necessary to better understand this relationship.
 
 ```{r}
-data_agg <- data_long %>% 
+#filter out NAN(first year of each team) and calculate the average payroll and average winning percentage of each team
+data_agg <- data_long %>%
+  group_by(team)%>% 
   filter(!is.na(diff_log)) %>%
   summarise(
-    avg_diff_log = sum(diff_log), 
+    avg_diff_log = mean(diff_log), 
     avg_win_pct = mean(win_pct))
 data_agg
 ```
@@ -450,72 +452,80 @@ data_agg
 ```{r}
 data_agg %>%
   ggplot(aes(x = avg_diff_log, y = avg_win_pct)) + 
-  geom_point(color = "blue", size= 3, alpha = 0.8) + 
+  geom_point(color = "red", size= 3, alpha = 0.8) + 
   geom_text(aes(label = team), size = 3) +
-  geom_smooth(method = "lm", formula = y ~ x, se = F, color = "yellow") + 
+  geom_smooth(method = "lm", formula = y ~ x,se=F,color = "black") + 
   geom_hline(aes(yintercept = mean(avg_win_pct)), color = "blue") +
-  labs(title = "MLB Team's Overall Win  vs. Payroll_log", 
-       x = "Diff_log_total", 
-       y = "Win_pct_avg")
+  labs(title = "Each Team's Average Winning Percentage  vs. Average Log Payroll", 
+       x = "Avg_Diff_Log", 
+       y = "Avg_Win_Pct")
 ```
+
+In the above analysis, a line of best fit was constructed based on the average log payroll increase and the average winning percentage. The results show that while there is a positive relationship between the two variables, it is quite weak. This is demonstrated by outliers such as the Washington Nationals, whose high payroll difference did not correspond with a significant increase in their average winning percentage.
+
+To further explore this relationship, a regression test was performed to assess the impact of the log payroll difference on the average winning percentage. This will provide more information about the relationship between the two variables and allow for a more thorough investigation into the factors that influence the winning percentage of a team.
 
 ```{r}
 reg_linear_all <- lm(win_pct~diff_log, data = data_long)
 summary(reg_linear_all)
 
 ```
+The results of the regression test further support the conclusion that, despite the weak correlation, there is a significant impact of the log payroll difference on the winning percentage. This makes sense as teams that invest more in acquiring top players are likely to perform better on the field. However, it's important to note that baseball is a team sport and success on the field is determined by many factors beyond just payroll. Further analysis is necessary to fully understand the impact of payroll changes on winning percentage and to identify other factors that may influence the relationship.
 
-
-```{r, diff_log and win_pct by year}
+```{r}
 data_long %>%
   filter(!is.na(diff_log)) %>%
   ggplot(aes(x=diff_log, y=win_pct, group=year, color=team)) +
   geom_point() +
-  geom_smooth(method="lm", formula=y~x, se=F,color="blue") +
-  facet_wrap(~year) + 
-  theme_bw() +
-  theme(legend.position = "none")
+  geom_smooth(method="lm", formula=y~x, se=F,color="black") +
+  facet_wrap(~year)
+
 ```
 
+After plotting the relationship between the log difference in payroll and the winning percentage, it becomes evident that the relationship between these two variables changes from year to year. In some years, there is a positive relationship between the log difference in payroll and the winning percentage, while in other years the relationship is negative.
 
-
-
-
+Therefore, we narrow our analysis to the years 2010 to 2014. By conducting a similar analysis on this time frame, we aim to gain a clearer understanding of the impact of the log difference in payroll on the winning percentage during these years.
 
 ```{r}
 pay_win <- merge(datapay, winmost, by = "team", all = TRUE)
 cor(pay_win$diff_log_14,pay_win$diff_win_14)
 ```
-```{r}
-pay_win
-```
+
+The correlation between the log difference in payroll and the log difference in winning between the years 2010 and 2014 is 0.227, which is stronger than the overall correlation of 0.167. This indicates that during the years 2010-2014, the impact of payroll on winning percentage was greater compared to the overall relationship. 
+
+However, the correlation coefficient of 0.227 represents a weak positive correlation, meaning there is a slight positive relationship between the two variables during this specific time frame. This suggests that payroll may have had a slightly bigger impact on a team's success during the years 2010-2014, though other factors should also be considered.
 
 ```{r}
 pay_win %>%
   ggplot(aes(x = diff_log_14, y = diff_win_14)) + 
-  geom_point(color = "blue", size= 3, alpha = 0.8) + 
+  geom_point(color = "red", size= 3, alpha = 0.8) + 
   geom_text(aes(label = team), size = 3) +
-  geom_smooth(method = "lm", formula = y ~ x, se = F, color = "yellow") + 
+  geom_smooth(method = "lm", formula = y ~ x, se = F, color = "black") + 
   geom_hline(aes(yintercept = mean(diff_win_14)), color = "blue") +
-  labs(title = "MLB Team's Overall Win  vs. Payroll_log", 
-       x = "Diff_log_total", 
-       y = "Win_pct_avg")
+  labs(title = "2010 - 2014 Each Team's Log Difference in Winning Percentage  vs. Log Difference in Payroll", 
+       x = "Log_Diff_Payment", 
+       y = "Log_Diff_Win")
 ```
 
+The plot confirms our previous conclusion that there are multiple factors that can impact a team's performance in addition to an increase in payroll. The plot also highlights the fact that the impact of these factors can vary from year to year.
+
+Going forward, it would be beneficial to delve further into the other factors that influence a team's success. This will allow us to gain a more comprehensive understanding of what drives a team's performance. Additionally, it may be useful to compare the benefits of evaluating a team's performance using either the log of the yearly payroll increase or the yearly payroll amount to determine which method is more effective.
 
 ## Comparison 
 
 Which set of factors are better explaining performance? Yearly payroll or yearly increase in payroll? What criterion is being used? 
 
 ```{r}
-yearly_paroll <- lm(win_pct~payroll, data = bb)
-summary(yearly_paroll)
+payroll_yearly <- lm(win_pct~payroll, data = bb)
+summary(payroll_yearly)
 ```
 
 ```{r}
-yearly_paroll <- lm(win_pct~diff_log, data = data_long)
-summary(yearly_paroll)
+payroll_yearly_increase <- lm(win_pct~diff_log, data = data_long)
+summary(payroll_yearly_increase)
 ```
+Based on the statistical analysis, using both yearly payroll and yearly increase in payroll show that they have a positive impact on team performance and are statistically significant. However, the regression model using yearly increase in payroll has a slightly higher R-squared, indicating it better explains team performance.
 
+Yearly increase in payroll is a better metric to evaluate a team's performance compared to yearly payroll because it takes into account the effects of monetary inflation. Additionally, every team has a different situation and reacts differently to changes in payroll. A team with a lot of rookies would benefit more from hiring star players, top coaches, and so on compared to a championship team. Hence, the yearly increase in payroll is a more accurate metric to evaluate a team's performance.
 
 
