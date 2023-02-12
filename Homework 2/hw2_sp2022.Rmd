@@ -230,33 +230,205 @@ brca <- brca[,-1]
 1. Summary and transformation
 
     a) How many patients are there in each sub-type? 
+```{r}
+table(c(brca_subtype))
+```
+**There are four sub-types and in each subtype there are this amount of patients: Basal = 208, Her2 = 91, LumA = 628,  LumB = 233**
+
 
     b) Randomly pick 5 genes and plot the histogram by each sub-type.
 
+```{r}
+len <- nrow(brca)
+random_indices <- sample(len, 5)
+
+five_r_patients <- data.frame(brca)[random_indices, ]
+
+vector <- as.factor(as.factor(brca_subtype[random_indices]))
+
+hist(table(vector), xlab = "subtypes", main="Histogram by each sub-type for 5 random genes", labels = levels(vector))
+
+
+```
+
+
+
     c) Remove gene with zero count and no variability. Then apply logarithmic transform.
+```{r}
+brca <- brca[,-1]
+non_zero_cols <- which(colSums(abs(brca)) != 0)
+filtered_brca <- brca[, non_zero_cols, with=F]
+
+transformed_brca <- log2(as.matrix(filtered_brca + 1e-10))
+```
 
 
 2. Apply kmeans on the transformed dataset with 4 centers and output the discrepancy table between the real sub-type `brca_subtype` and the cluster labels.
 
+```{r}
+num_centers <- 4
+brca_kmeans <- kmeans(transformed_brca, num_centers)
+
+table(brca_subtype, brca_kmeans$cluster)
+```
+
 3. Spectrum clustering: to scale or not to scale?
 
     a) Apply PCA on the centered and scaled dataset. How many PCs should we use and why? You are encouraged to use `irlba::irlba()`.
+
+**We should apply 4 PCs because the explained variance for each PC int he PCA result drops off after four.**
+
+```{r}
+scaled_centered_brca <- scale(transformed_brca) 
+num_genes <- ncol(scaled_centered_brca)
+
+pca_result <- irlba::irlba(scaled_centered_brca, 10, verbose = F)
+
+n <- nrow(scaled_centered_brca)
+explained_var <- (pca_result$d^2)/(n - 1)
+explained_var_apx <- explained_var / num_genes
+plot(explained_var_apx)
+
+num_pcs <- 4
+pca_result <- irlba::irlba(scaled_centered_brca, nv = num_pcs, verbose = F)
+```
+
     
     b) Plot PC1 vs PC2 of the centered and scaled data and PC1 vs PC2 of the centered but unscaled data side by side. Should we scale or not scale for clustering process? Why? (Hint: to put plots side by side, use `gridExtra::grid.arrange()` or `ggpubr::ggrrange()` or `egg::ggrrange()` for ggplots; use `fig.show="hold"` as chunk option for base plots)
+```{r}
+brca_unscaled <- scale(transformed_brca, scale = F)
+
+pca_result_unscaled <- irlba::irlba(brca_unscaled, num_pcs)
+
+pc_unscaled_scores <- pca_result_unscaled$u[, 1:num_pcs] * pca_result_unscaled$d[1:num_pcs]
+
+pc_scaled_scores <- pca_result$u[, 1:num_pcs] * pca_result$d[1:num_pcs]
+```
+```{r}
+plot_unscaled <- data.table(x = pc_unscaled_scores[, 1], y = pc_unscaled_scores[, 2]) %>% 
+  ggplot() + 
+  geom_point(aes(x, y, col = as.factor(brca_subtype))) + 
+  xlab("PC1") + 
+  ylab("PC2") + 
+  ggtitle("Unscaled and Centered") + 
+  theme_bw() + 
+  labs(color = "Cancer Type")
+
+
+plot_scaled <- data.table(x = pc_scaled_scores[, 1], y = pc_scaled_scores[, 2]) %>% 
+  ggplot() + 
+  geom_point(aes(x, y, col = as.factor(brca_subtype))) + 
+  xlab("PC1") + 
+  ylab("PC2") + 
+  ggtitle("Scaled and Centered") + 
+  theme_bw() + 
+  labs(color = "Cancer Type")
+
+ggpubr::ggarrange(plot_scaled, plot_unscaled)
+```
+**We should not scale because the unscaled data is clustered better for PC1 and PC2. Separation of categories is much better defined for unscaled brca than for scaled, so we should keep the data centered and unscaled.**
 
 4. Spectrum clustering: center but do not scale the data
 
     a) Use the first 4 PCs of the centered and unscaled data and apply kmeans. Find a reasonable number of clusters using within sum of squared with the elbow rule.
     
+```{r}
+calculate_wss <- function(data, num_clusters) {
+  kmeans_result <- kmeans(data, num_clusters, nstart = 10)
+  return (kmeans_result$tot.withinss)
+}
+
+number_of_clusters <- 1:10
+wss_results <- sapply(number_of_clusters, function(k) calculate_wss(pc_unscaled_scores[, 1:4], k))
+wss_data <- data.frame(k = number_of_clusters, wss = wss_results)
+
+ggplot(data = wss_data, aes(x = k, y = wss)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "# of Clusters (K)", y = "WSS") +
+  ggtitle("Within-Cluster Sum of Squares (WSS) vs Number of Clusters (K)")
+
+```
+
+**By the elbow rule, four clusters is an appropriate amount of clusters. **
+    
     b) Choose an optimal cluster number and apply kmeans. Compare the real sub-type and the clustering label as follows: Plot scatter plot of PC1 vs PC2. Use point color to indicate the true cancer type and point shape to indicate the clustering label. Plot the kmeans centroids with black dots. Summarize how good is clustering results compared to the real sub-type.
     
+```{r}
+num_pcs <- 4
+num_clusters <- 4
+
+kmeans_result <- kmeans(x = pc_unscaled_scores[, 1:num_pcs], centers = num_clusters)
+
+cluster_centers <- data.frame(kmeans_result$centers[, 1:2])
+cluster_centers$cluster <- as.factor(1:num_clusters)
+
+plot_data <- data.frame(x = pc_unscaled_scores[, 1], 
+                        y = pc_unscaled_scores[, 2],
+                        label = as.factor(brca_subtype),
+                        cluster = as.factor(kmeans_result$cluster))
+
+PC1 <- pc_unscaled_scores[, 1]
+PC2 <- pc_unscaled_scores[, 2]
+
+
+cluster_centers[, 1]
+cluster_centers[, 2]
+
+ggplot(data = plot_data) + 
+  geom_point(aes(x, y, color = label, shape = cluster)) + 
+  geom_point(data = cluster_centers, aes(x = cluster_centers[, 2], y = cluster_centers[, 2], shape = cluster), size = 5) +
+  
+  labs(title = "Centered and Unscaled PC1 vs PC2 (k = 4)", x = "PC 1", y = "PC 2") +
+  theme_classic()
+```
+
+    
     c) Compare the clustering result from applying kmeans to the original data and the clustering result from applying kmeans to 4 PCs. Does PCA help in kmeans clustering? What might be the reasons if PCA helps?
+```{r}
+tab1 <- table(brca_subtype, brca_kmeans$cluster)
+tab2 <- table(brca_subtype, kmeans_result$cluster)
+
+tab1
+tab2
+```
+**Yes, significantly. Using PCA minimized the sum of squares within each cluster effectively as it significantly reduces the total within cluster sum of squares compared to the original dataset. We can see this as there are larger numbers of cancer types into each subtype.**
     
     d) Now we have an x patient with breast cancer but with unknown sub-type. We have this patient's mRNA sequencing data. Project this x patient to the space of PC1 and PC2. (Hint: remember we remove some gene with no counts or no variablity, take log and centered) Plot this patient in the plot in iv) with a black dot. Calculate the Euclidean distance between this patient and each of centroid of the cluster. Can you tell which sub-type this patient might have? 
-    
+
+**X_patient belongs in cluster two which most closely resembles LumA**
+
 ```{r}
 x_patient <- fread("data/brca_x_patient.csv")
+
+
+x_patient %>% dplyr::select(column_names)
+sel_cols <- which(x_patient != 0)
+x_patient_sub <- x_patient[, sel_cols, with=F]
+x_patient_sub <- log2(as.matrix(x_patient_sub+1e-10))
+
+
+x_patient <- x_patient[ , which(colnames(x_patient) %in% colnames(transformed_brca))]
+
+x_patient <- log2(as.matrix(x_patient+1e-10))
+
+x_patient_c <- scale(x_patient, scale = F)
+x_patient_pcscores <- as.vector(x_patient_c) %*% pca_result_unscaled$v[,1:4]
+
+x_patient_d <- kmeans_result$centers - t(matrix((x_patient_pcscores), nrow=4, ncol=4))
+x_patient_d <- sqrt(rowSums(x_patient_d ^ 2))
+
+x_patient_d
+which.min(x_patient_d)
+
+ggplot(data = plot_data) + 
+  geom_point(aes(x, y, color = label, shape = cluster)) + 
+  geom_point(data = cluster_centers, aes(x = cluster_centers[, 2], y = cluster_centers[, 2], shape = cluster), size = 5) +
+  geom_point(aes(x = x_patient_pcscores[1], y = x_patient_pcscores[2]))
+  labs(title = "Centered and Unscaled PC1 vs PC2 (k = 4)", x = "PC 1", y = "PC 2") +
+  theme_classic()
 ```
+
 
 
 # Case study 3: Auto data set
