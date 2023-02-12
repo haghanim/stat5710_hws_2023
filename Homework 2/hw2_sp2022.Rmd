@@ -401,13 +401,6 @@ tab2
 ```{r}
 x_patient <- fread("data/brca_x_patient.csv")
 
-
-x_patient %>% dplyr::select(column_names)
-sel_cols <- which(x_patient != 0)
-x_patient_sub <- x_patient[, sel_cols, with=F]
-x_patient_sub <- log2(as.matrix(x_patient_sub+1e-10))
-
-
 x_patient <- x_patient[ , which(colnames(x_patient) %in% colnames(transformed_brca))]
 
 x_patient <- log2(as.matrix(x_patient+1e-10))
