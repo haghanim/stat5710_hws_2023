@@ -1,0 +1,288 @@
+---
+title: "Modern Data Mining, HW 3"
+author:
+- Group Member 1
+- Group Member 2
+- Group Member 3
+date: 'Due: 11:59Pm,  2/26, 2023'
+output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: '4'
+  html_document:
+    code_folding: hide
+    highlight: haddock
+    number_sections: yes
+    theme: lumen
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+  word_document:
+    toc: yes
+    toc_depth: '4'
+urlcolor: blue
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, fig.width=8, fig.height=4)
+options(scipen = 0, digits = 3)  # controls base R output
+# check if you have ISLR package, if not, install it
+if(!require('pacman')) {install.packages('pacman')}
+pacman::p_load(ISLR, readxl, magrittr, dplyr, ggplot2) # add the packages needed
+```
+
+
+\pagebreak
+
+# Overview
+
+Multiple regression is one of the most popular methods used in statistics as well as in machine learning. We use linear models as a working model for its simplicity and interpretability. It is important that we use domain knowledge as much as we could to determine the form of the response as well as the function format for the factors. Then, when we have many possible features to be included in the working model it is inevitable that we need to choose a best possible model with a sensible criterion. `Cp`, `BIC` and regularizations such as LASSO are introduced. Be aware that if a model selection is done formally or informally, the inferences obtained with the final `lm()` fit may not be valid. Some adjustment will be needed. This last step is beyond the scope of this class. Check the current research line that Linda and collaborators are working on. 
+
+This homework consists of two parts: the first one is an exercise (you will feel it being a toy example after the covid case study) to get familiar with model selection skills such as, `Cp` and `BIC`. The main job is a rather involved case study about devastating covid19 pandemic.  Please read through the case study first.  This project is for sure a great one listed in your CV. 
+
+For covid case study, the major time and effort would be needed in EDA portion.
+
+## Objectives
+
+- Model building process
+
+- Methods
+    - Model selection
+        + All subsets
+        + Forward/Backward
+    - Regularization
+        + LASSO (L1 penalty)
+        + Ridge (L2 penalty)
+        + Elastic net
+- Understand the criteria 
+    - `Cp`
+    - Testing Errors
+    - `BIC` 
+    - `K fold Cross Validation`
+    - `LASSO` 
+- Packages
+    - `lm()`, `Anova`
+    - `regsubsets()`
+    - `glmnet()` & `cv.glmnet()`
+
+# Review materials
+
+- Study lecture: Model selection
+- Study lecture: Regularization
+- Study lecture: Multiple regression
+
+Review the code and concepts covered during lectures: multiple regression, model selection and penalized regression through elastic net. 
+
+# Homework 2, Case study 3: Auto data set  
+
+If you haven't done this as part of the homework 2, please attach it here. 
+
+# Case study 1:  `ISLR::Auto` data
+
+This will be the last part of the Auto data from ISLR. The original data contains 408 observations about cars. It has some similarity as the Cars data that we use in our lectures. To get the data, first install the package `ISLR`. The data set `Auto` should be loaded automatically. We use this case to go through methods learned so far. 
+
+Final modelling question: We want to explore the effects of each feature as best as possible. 
+
+1) Preparing variables: 
+
+```{r}
+#install.packages("ISLR")
+```
+
+```{r}
+head(Auto)
+```
+
+
+a) You may explore the possibility of variable transformations. We normally do not suggest to transform $x$ for the purpose of interpretation. You may consider to transform $y$ to either correct the violation of the linear model assumptions or if you feel a transformation of $y$ makes more sense from some theory. In this case we suggest you to look into `GPM=1/MPG`. Compare residual plots of MPG or GPM as responses and see which one might yield a more satisfactory patterns. 
+
+In addition, can you provide some background knowledge to support the notion: it makes more sense to model `GPM`?  
+
+Plot MPG 
+```{r}
+P_MPG <- Auto %>%
+  select(-name)
+Fit_MPG <- lm(mpg~., data = P_MPG)
+summary(Fit_MPG)
+
+par(mfrow=c(1, 2))
+plot(Fit_MPG, 1)
+plot(Fit_MPG, 2)
+```
+
+Create GPM and Plot
+```{r}
+P_GPM <- Auto %>% 
+  mutate(gpm = 1/mpg) %>% 
+  select(-name,-mpg)
+  
+Fit_GPM <- lm(gpm~., data = P_GPM)
+summary(Fit_GPM)
+
+par(mfrow=c(1, 2))
+plot(Fit_GPM, 1)
+plot(Fit_GPM, 2)
+```
+
+Comparing the residual plots of MPG and GPM, it is clear that using GPM as the dependent variable in linear regression analysis is a better choice. This is because GPM allows us to better meet the linearity and homoscedasticity requirements of the linear regression assumptions. The curve of the residual plot for GPM is much flatter than that of MPG, indicating that the residuals are more evenly distributed. Therefore, in this case, we should replace MPG with GPM. As for the qq-plot, both variables show outliers.
+
+In addition to meeting regression assumptions, using GPM instead of MPG makes more sense in terms of clarity. It is easier to understand that if a car is more fuel-efficient, it should have a lower gallon per mile value.
+
+
+
+b) You may also explore by adding interactions and higher order terms. The model(s) should be as *parsimonious* (simple) as possible, unless the gain in accuracy is significant from your point of view. 
+
+Fit a regression model using all predictors and factors term 
+```{r}
+#Factor
+F_GPM <- P_GPM %>%
+  mutate(cylinders = factor(cylinders, levels = c(4, 3, 5, 6, 8)),
+         origin = factor(origin))
+# Fit a regression model using all predictors
+fit_F_GPM.all <- lm(gpm ~ ., data = F_GPM )
+
+summary(fit_F_GPM.all)
+```
+
+
+```{r}
+#Add Interaction Term
+I_F_GPM <- F_GPM %>%
+  mutate(hp_weight_interaction = horsepower * weight, #interaction term 1: hp * weight
+         disp_weight_interaction = displacement * weight) #interaction term 2: displacement * weight
+```
+
+Fit the regression with factor and interaction
+```{r}
+#
+fit_I_F_GPM.all <- lm(gpm ~ ., data = I_F_GPM )
+summary(fit_I_F_GPM.all)
+```
+
+
+Test Interaction Term using ANOVA
+```{r}
+anova(Fit_GPM, fit_I_F_GPM.all)
+```
+Based on the summary output of the regression analysis, it was observed that the adjusted R^2 of the linear regression model increased from 0.888 to 0.891 after adding two interaction terms, namely "hp_weight_interaction" and "disp_weight_interaction". The p-values of the two interaction terms were relatively small.
+
+Furthermore, based on the ANOVA test, the p-value of the F-test was found to be 2.5e-05. As a result, we failed to reject the null hypothesis, which stated that model 1 (without interaction terms) was equal to model 2 (with interaction terms).
+
+However, even though adding interaction terms did not negatively impact the performance of the model, it did not significantly improve its performance. Therefore, there is no need to add these interaction terms in order to keep the model as simple as possible. Instead, we will use BIC and CP to further investigate this problem.
+
+c) Use Mallow's $C_p$ or BIC to select the model.
+
+
+```{r}
+library(leaps)
+fit_I_F_GPM.exh <- regsubsets(gpm ~., data = I_F_GPM , nvmax = 25, method="exhaustive")
+f.e <- summary(fit_I_F_GPM.exh)
+f.e
+```
+
+**All Subsets selection with Cp**:
+```{r}
+f.e$cp
+plot(f.e$cp, xlab="Number of predictors",
+     ylab="Cp", col="blue", pch=16, cex =3)
+coef(fit_I_F_GPM.exh,10)
+
+```
+
+```{r}
+opt.size <- which.min(f.e$cp)
+opt.size
+```
+
+```{r}
+fit.exh.var <- f.e$which 
+fit.exh.var[opt.size,]
+```
+```{r}
+fit.exh.var <- f.e$which
+colnames(fit.exh.var)[fit.exh.var[opt.size,]]
+```
+Based on Cp, the best model optimal model size will be 10. The best model with Cp will include variables `cylinders`,`displacement`,`horsepower`, `weight`, `origin`, `year`,`hp_weight_interaction`,`disp_weight_interaction`.
+
+**All Subsets selection with BIC**
+```{r}
+f.e$bic
+plot(f.e$bic, xlab="Number of predictors",
+     ylab="BIC", col="Blue", type="p", pch=16, cex = 3)
+```
+
+```{r}
+opt.size <- which.min(f.e$bic)
+opt.size
+```
+
+```{r}
+fit.exh.var <- f.e$which 
+fit.exh.var[opt.size,]
+```
+```{r}
+fit.exh.var <- f.e$which
+colnames(fit.exh.var)[fit.exh.var[opt.size,]]
+```
+Based on the BIC analysis, the optimal model size is 7. This means that the best model, as determined by BIC, will include the variables `cylinders`, `displacement`, `horsepower`, `weight`, `year`, `hp_weight_interaction`, and `disp_weight_interaction`.
+
+Given the outcome of the BIC analysis, there is no need to try both BIC and Cp. Instead, we will use the BIC result to finalize the model selection.
+
+**Final Model**
+```{r}
+fit_I_F_GPM.final <- lm(gpm ~ cylinders + horsepower + weight + year + displacement + hp_weight_interaction + disp_weight_interaction , data = I_F_GPM)
+summary(fit_I_F_GPM.final)
+
+```
+
+
+
+2) Describe the final model and its accuracy. Include diagnostic plots with particular focus on the model residuals.
+
+  * Summarize the effects found.
+```{r}
+summary(fit_I_F_GPM.final)
+anova(fit_I_F_GPM.final)
+```
+
+The regression model's adjusted R^2 value is 0.89, indicating that the model's performance is solid. However, the p-value for the 'cylinders5' variable is high due to the lack of observations for that variable.
+
+Based on the ANOVA test, the p-value for the 'displacement' and 'hp_weight' interaction term is large. If time permits, we could reconsider the 'displacement' variable and the two interaction terms and rebuild the model with only four variables: 'cylinders', 'horsepower', 'weight', and 'year'.
+
+```{r}
+plot(fit_I_F_GPM.final, 1) 
+plot(fit_I_F_GPM.final, 2)
+```
+Based on the residual plot, we can observe that the curve is relatively flat. This suggests that the model meets the assumptions of linearity and homoscedasticity. Furthermore, the qq-plot also indicates that the model meets the assumption of normality, although it is slightly impacted by outliers.
+
+
+  * Predict the `mpg` of a car that is: built in 1983, in the US, red, 180 inches long, 8 cylinders, 350 displacement, 260 as horsepower, and weighs 4,000 pounds. Give a 95% CI.
+
+```{r}
+new <- I_F_GPM [1, ]
+new[1:10] <- c(8, 350, 260, 4000, 0, 83, 1, 0,260*4000,350*4000)
+
+new <- new %>%
+mutate(cylinders = as.factor(cylinders))
+
+new
+```
+
+
+```{r}
+predict(fit_I_F_GPM.final, new, interval = "confidence", se.fit = TRUE)
+```
+By using the model that was selected by minimizing BIC, we can predict that the GPM of the new car will be 0.0702, with a 95% confidence interval between 0.065 and 0.0754.
+
+
+  * Any suggestions as to how to improve the quality of the study?
+
+There are several ways in which we could improve the quality of this study. Firstly, we should increase the size of the dataset as we currently only have around 400 observations, which may not be able to fully reflect the diversity of automobiles worldwide. Secondly, we should address the imbalance in the dataset. We can observe that there are significantly fewer observations for cars with 5 cylinders than for other types of cylinders. This could lead to misleading regression analyses, and we could address this by adding more cars with 5 cylinders to the dataset. Additionally, we should remove any outliers present in the dataset. Finally, during the model selection stage, we could consider adding penalties to our model (e.g. CV-LASSO) to improve its performance.
+
+
+# Case study 2: COVID19
+
+See a seperate file covid_case_study.Rmd for details. 
+
